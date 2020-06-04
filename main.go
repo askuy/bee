@@ -15,6 +15,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -30,6 +31,7 @@ var (
 )
 
 func main() {
+	fmt.Println("hello bee")
 	currentpath, _ := os.Getwd()
 	if workspace != "" {
 		currentpath = workspace

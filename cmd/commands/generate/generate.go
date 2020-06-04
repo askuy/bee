@@ -14,6 +14,7 @@
 package generate
 
 import (
+	"github.com/beego/bee/generate/beegopro"
 	"os"
 	"strings"
 
@@ -92,6 +93,8 @@ func GenerateCode(cmd *commands.Command, args []string) int {
 
 	gcmd := args[0]
 	switch gcmd {
+	case "beegopro":
+		beegopro.DefaultBeegoPro.Generate()
 	case "scaffold":
 		scaffold(cmd, args, currpath)
 	case "docs":

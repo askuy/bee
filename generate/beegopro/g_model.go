@@ -12,28 +12,25 @@
 // License for the specific language governing permissions and limitations
 // under the License.
 
-package generate
+package beegopro
 
 import (
 	"errors"
 	"fmt"
+	beeLogger "github.com/beego/bee/logger"
+	"github.com/beego/bee/utils"
+	"github.com/flosch/pongo2"
+	"github.com/smartwalle/pongo2render"
 	"go/format"
 	"io/ioutil"
 	"os"
 	"path"
 	"strings"
-
-	beeLogger "github.com/beego/bee/logger"
-	"github.com/beego/bee/logger/colors"
-	"github.com/beego/bee/utils"
-	"github.com/flosch/pongo2"
-	"github.com/smartwalle/pongo2render"
+	"time"
 )
 
-func GenerateModel(mname, fields, currpath string) {
-	var render = pongo2render.NewRender("/home/www/server/opensource/bee-mod/default")
-
-	w := colors.NewColorWriter(os.Stdout)
+func (c *Container) renderModel(mname, fields string) (err error) {
+	var render = pongo2render.NewRender(c.Option.GitPath + "/" + c.Option.ProType)
 
 	p, f := path.Split(mname)
 	modelName := strings.Title(f)
@@ -51,12 +48,11 @@ func GenerateModel(mname, fields, currpath string) {
 	beeLogger.Log.Infof("Using '%s' as model name", modelName)
 	beeLogger.Log.Infof("Using '%s' as package name", packageName)
 
-	fp := path.Join(currpath, "models", p)
-	if _, err := os.Stat(fp); os.IsNotExist(err) {
-		// Create the model's directory
-		if err := os.MkdirAll(fp, 0777); err != nil {
-			beeLogger.Log.Fatalf("Could not create the model directory: %s", err)
-		}
+	fp := path.Join(c.Option.BeegoPath, "models", p)
+	err = createPath(fp)
+	if err != nil {
+		beeLogger.Log.Fatalf("Could not create the model directory: %s", err)
+		return
 	}
 
 	ctx := pongo2.Context{
@@ -76,12 +72,13 @@ func GenerateModel(mname, fields, currpath string) {
 	if err != nil {
 		beeLogger.Log.Fatalf("Could not create the model render tmpl: %s", err)
 	}
-	err = write(fpath, buf)
+	err = c.write(fpath, buf)
 	if err != nil {
 		beeLogger.Log.Fatalf("Could not create model file: %s", err)
 		return
 	}
-	_, _ = fmt.Fprintf(w, "\t%s%screate%s\t %s%s\n", "\x1b[32m", "\x1b[1m", "\x1b[21m", fpath, "\x1b[0m")
+	beeLogger.Log.Infof("create file '%s'", fpath)
+	return
 }
 
 func getStruct(structname, fields string) (string, bool, error) {
@@ -149,10 +146,19 @@ func getType(ktype string) (kt, tag string, hasTime bool) {
 }
 
 // write 写bytes到文件
-func write(filename string, buf string) (err error) {
-	if utils.IsExist(filename) {
+func (c *Container) write(filename string, buf string) (err error) {
+	if !c.Option.Overwrite && utils.IsExist(filename) {
 		err = errors.New("file is exist, path is " + filename)
 		return
+	}
+
+	if c.Option.Overwrite && utils.IsExist(filename) {
+		bakName := fmt.Sprintf("%s.%d.bak", filename, time.Now().Unix())
+		beeLogger.Log.Infof("bak file '%s'", bakName)
+		if err := os.Rename(filename, bakName); err != nil {
+			err = errors.New("file is bak error, path is " + bakName)
+			return err
+		}
 	}
 
 	filePath := path.Dir(filename)

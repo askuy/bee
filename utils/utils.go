@@ -43,12 +43,6 @@ func Go(f func() error) chan error {
 	return ch
 }
 
-// IsExist returns whether a file or directory exists.
-func IsExist(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil || os.IsExist(err)
-}
-
 // GetGOPATHs returns all paths in GOPATH variable.
 func GetGOPATHs() []string {
 	gopath := os.Getenv("GOPATH")
