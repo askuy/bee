@@ -42,7 +42,7 @@ func (c *Container) renderModel(modelName string, content ModelsContent) (err er
 }
 
 func (c *Container) textRenderModel(mname string, content ModelsContent) {
-	render := NewGenRender("models", mname, c.Option)
+	render := NewRenderGo("models", mname, c.Option)
 	modelStruct, hastime, err := getStruct(render.Name, content.Schema)
 	if err != nil {
 		beeLogger.Log.Fatalf("Could not generate the model struct: %s", err)
@@ -76,7 +76,7 @@ func (c *Container) databaseRenderModel(mname string, content ModelsContent) {
 
 	tb := getTableObject(mname, db, trans)
 
-	render := NewGenRender("models", utils.CamelCase(tb.Name), c.Option)
+	render := NewRenderGo("models", utils.CamelCase(tb.Name), c.Option)
 
 	render.SetContext("modelStruct", tb.String())
 	render.SetContext("tableName", utils.SnakeString(render.Name))

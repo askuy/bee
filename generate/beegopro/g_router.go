@@ -20,7 +20,7 @@ func (c *Container) renderRouter(modelName string, content ModelsContent) (err e
 }
 
 func (c *Container) textRenderRouters(cname string, content ModelsContent) {
-	render := NewGenRender("routers", cname, c.Option)
+	render := NewRenderGo("routers", cname, c.Option)
 	render.Exec("router.go.tmpl")
 	return
 }
@@ -45,7 +45,7 @@ func (c *Container) databaseRenderRouters(cname string, content ModelsContent) {
 	if tb.Pk == "" {
 		return
 	}
-	render := NewGenRender("routers", cname, c.Option)
+	render := NewRenderGo("routers", cname, c.Option)
 	render.Exec("router.go.tmpl")
 	return
 }

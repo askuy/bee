@@ -14,18 +14,19 @@ import (
 
 var DefaultBeegoPro = &Container{
 	Option: Option{
-		Dsn:          "",
-		Driver:       "",
-		ProType:      "default",
-		ProVersion:   "v1",
-		EnableModule: "",
-		ApiPrefix:    "/",
-		BeegoPath:    system.CurrentDir,
-		Models:       make(map[string]ModelsContent, 0),
-		Url:          "git@github.com:beego-dev/bee-mod.git",
-		Branch:       "master",
-		GitPath:      system.BeegoHome + "/bee-mod",
-		Overwrite:    false,
+		Dsn:           "",
+		Driver:        "",
+		ProType:       "default",
+		ProVersion:    "v1",
+		EnableModule:  "",
+		ApiPrefix:     "/",
+		BeegoPath:     system.CurrentDir,
+		AntDesignPath: system.CurrentDir,
+		Models:        make(map[string]ModelsContent, 0),
+		Url:           "git@github.com:beego-dev/bee-mod.git",
+		Branch:        "master",
+		GitPath:       system.BeegoHome + "/bee-mod",
+		Overwrite:     false,
 	},
 	BeegoJson:    system.CurrentDir + "/beegopro.json",
 	CurPath:      system.CurrentDir,
@@ -47,6 +48,8 @@ func init() {
 	DefaultBeegoPro.SingleRender["antDesign"] = make(map[string]ProSingleRender, 0)
 	DefaultBeegoPro.SingleRender["antDesign"]["models"] = DefaultBeegoPro.renderModel
 	DefaultBeegoPro.SingleRender["antDesign"]["controllers"] = DefaultBeegoPro.renderController
+	DefaultBeegoPro.SingleRender["antDesign"]["routers"] = DefaultBeegoPro.renderRouter
+	DefaultBeegoPro.SingleRender["antDesign"]["antList"] = DefaultBeegoPro.renderAntList
 
 	pongo2.RegisterFilter("lowerfirst", lwfirst)
 	pongo2.RegisterFilter("upperfirst", upperfirst)

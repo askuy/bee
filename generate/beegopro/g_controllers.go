@@ -38,7 +38,7 @@ func (c *Container) renderController(modelName string, content ModelsContent) (e
 }
 
 func (c *Container) textRenderController(cname string, content ModelsContent) {
-	render := NewGenRender("controllers", cname, c.Option)
+	render := NewRenderGo("controllers", cname, c.Option)
 	modelPath := path.Join(c.Option.BeegoPath, "models", strings.ToLower(render.Name)+".go")
 	if utils.IsExist(modelPath) {
 		beeLogger.Log.Infof("Using matching model '%s'", render.Name)
@@ -69,7 +69,7 @@ func (c *Container) databaseRenderController(cname string, content ModelsContent
 	if tb.Pk == "" {
 		return
 	}
-	render := NewGenRender("controllers", tb.Name, c.Option)
+	render := NewRenderGo("controllers", tb.Name, c.Option)
 
 	// 判断是否有models
 	modelPath := path.Join(c.Option.BeegoPath, "models", strings.ToLower(render.Name)+".go")
