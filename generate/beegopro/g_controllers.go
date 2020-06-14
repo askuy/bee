@@ -15,8 +15,8 @@
 package beegopro
 
 import (
-	"github.com/flosch/pongo2"
-	"github.com/smartwalle/pongo2render"
+	"database/sql"
+	"errors"
 	"path"
 	"strings"
 
@@ -24,62 +24,60 @@ import (
 	"github.com/beego/bee/utils"
 )
 
-func (c *Container) renderController(cname, fields string) (err error) {
-	var render = pongo2render.NewRender(c.Option.GitPath + "/" + c.Option.ProType)
-
-	p, f := path.Split(cname)
-	controllerName := strings.Title(f)
-	packageName := "controllers"
-
-	if p != "" {
-		i := strings.LastIndex(p[:len(p)-1], "/")
-		packageName = p[i+1 : len(p)-1]
-	}
-
-	beeLogger.Log.Infof("Using '%s' as controller name", controllerName)
-	beeLogger.Log.Infof("Using '%s' as package name", packageName)
-
-	fp := path.Join(c.Option.BeegoPath, "controllers", p)
-	err = createPath(fp)
-	if err != nil {
-		beeLogger.Log.Fatalf("Could not create the controllers directory: %s", err)
+func (c *Container) renderController(modelName string, content ModelsContent) (err error) {
+	switch content.SourceGen {
+	case "text":
+		c.textRenderController(modelName, content)
+		return
+	case "database":
+		c.databaseRenderController(modelName, content)
 		return
 	}
+	err = errors.New("not support source gen, source gen is " + content.SourceGen)
+	return
+}
 
-	fpath := path.Join(fp, strings.ToLower(controllerName)+".go")
-	pkgPath := getPackagePath(c.Option.BeegoPath)
-
-	ctx := pongo2.Context{
-		"packageName":    packageName,
-		"controllerName": controllerName,
-		"pkgPath":        pkgPath,
-		"apiPrefix":      c.Option.ApiPrefix,
-	}
-
-	var (
-		buf string
-	)
-	// 判断是否有models
-	modelPath := path.Join(c.Option.BeegoPath, "models", strings.ToLower(controllerName)+".go")
+func (c *Container) textRenderController(cname string, content ModelsContent) {
+	render := NewGenRender("controllers", cname, c.Option)
+	modelPath := path.Join(c.Option.BeegoPath, "models", strings.ToLower(render.Name)+".go")
 	if utils.IsExist(modelPath) {
-		beeLogger.Log.Infof("Using matching model '%s'", controllerName)
-		buf, err = render.Template("controllers/controllerModel.go.tmpl").Execute(ctx)
-		if err != nil {
-			beeLogger.Log.Fatalf("Could not create the model render tmpl: %s", err)
-			return
-		}
+		beeLogger.Log.Infof("Using matching model '%s'", render.Name)
+		render.Exec("controllerModel.go.tmpl")
 	} else {
-		buf, err = render.Template("controllers/controller.go.tmpl").Execute(ctx)
-		if err != nil {
-			beeLogger.Log.Fatalf("Could not create the model render tmpl: %s", err)
-			return
-		}
+		render.Exec("controller.go.tmpl")
 	}
-	err = c.write(fpath, buf)
+	return
+}
+
+func (c *Container) databaseRenderController(cname string, content ModelsContent) {
+	// todo uniform sql open
+	db, err := sql.Open(c.Option.Driver, c.Option.Dsn)
 	if err != nil {
-		beeLogger.Log.Fatalf("Could not create model file: %s", err)
+		beeLogger.Log.Fatalf("Could not connect to '%s' database using '%s': %s", c.Option.Driver, c.Option.Dsn, err)
 		return
 	}
-	beeLogger.Log.Infof("create file '%s'", fpath)
+
+	defer db.Close()
+
+	trans, ok := dbDriver[c.Option.Driver]
+	if !ok {
+		beeLogger.Log.Fatalf("Generating app code from '%s' database is not supported yet.", c.Option.Driver)
+		return
+	}
+
+	tb := getTableObject(cname, db, trans)
+	if tb.Pk == "" {
+		return
+	}
+	render := NewGenRender("controllers", tb.Name, c.Option)
+
+	// 判断是否有models
+	modelPath := path.Join(c.Option.BeegoPath, "models", strings.ToLower(render.Name)+".go")
+	if utils.IsExist(modelPath) {
+		beeLogger.Log.Infof("Using matching model '%s'", render.Name)
+		render.Exec("controllerModel.go.tmpl")
+	} else {
+		render.Exec("controller.go.tmpl")
+	}
 	return
 }

@@ -15,12 +15,11 @@
 package beegopro
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	beeLogger "github.com/beego/bee/logger"
 	"github.com/beego/bee/utils"
-	"github.com/flosch/pongo2"
-	"github.com/smartwalle/pongo2render"
 	"go/format"
 	"io/ioutil"
 	"os"
@@ -29,56 +28,66 @@ import (
 	"time"
 )
 
-func (c *Container) renderModel(mname, fields string) (err error) {
-	var render = pongo2render.NewRender(c.Option.GitPath + "/" + c.Option.ProType)
-
-	p, f := path.Split(mname)
-	modelName := strings.Title(f)
-	packageName := "models"
-	if p != "" {
-		i := strings.LastIndex(p[:len(p)-1], "/")
-		packageName = p[i+1 : len(p)-1]
+func (c *Container) renderModel(modelName string, content ModelsContent) (err error) {
+	switch content.SourceGen {
+	case "text":
+		c.textRenderModel(modelName, content)
+		return
+	case "database":
+		c.databaseRenderModel(modelName, content)
+		return
 	}
+	err = errors.New("not support source gen, source gen is " + content.SourceGen)
+	return
+}
 
-	modelStruct, hastime, err := getStruct(modelName, fields)
+func (c *Container) textRenderModel(mname string, content ModelsContent) {
+	render := NewGenRender("models", mname, c.Option)
+	modelStruct, hastime, err := getStruct(render.Name, content.Schema)
 	if err != nil {
 		beeLogger.Log.Fatalf("Could not generate the model struct: %s", err)
 	}
-
-	beeLogger.Log.Infof("Using '%s' as model name", modelName)
-	beeLogger.Log.Infof("Using '%s' as package name", packageName)
-
-	fp := path.Join(c.Option.BeegoPath, "models", p)
-	err = createPath(fp)
-	if err != nil {
-		beeLogger.Log.Fatalf("Could not create the model directory: %s", err)
-		return
-	}
-
-	ctx := pongo2.Context{
-		"packageName": packageName,
-		"modelName":   modelName,
-		"modelStruct": modelStruct,
-	}
-	fpath := path.Join(fp, strings.ToLower(modelName)+".go")
-
+	render.SetContext("modelStruct", modelStruct)
+	render.SetContext("tableName", utils.SnakeString(render.Name))
 	if hastime {
-		ctx["timePkg"] = `"time"`
+		render.SetContext("timePkg", `"time"`)
 	} else {
-		ctx["timePkg"] = ""
+		render.SetContext("timePkg", ``)
 	}
 
-	buf, err := render.Template("models/TABLE_NAME.go.tmpl").Execute(ctx)
+	render.Exec("model.go.tmpl")
+}
+
+func (c *Container) databaseRenderModel(mname string, content ModelsContent) {
+	// todo uniform sql open
+	db, err := sql.Open(c.Option.Driver, c.Option.Dsn)
 	if err != nil {
-		beeLogger.Log.Fatalf("Could not create the model render tmpl: %s", err)
-	}
-	err = c.write(fpath, buf)
-	if err != nil {
-		beeLogger.Log.Fatalf("Could not create model file: %s", err)
+		beeLogger.Log.Fatalf("Could not connect to '%s' database using '%s': %s", c.Option.Driver, c.Option.Dsn, err)
 		return
 	}
-	beeLogger.Log.Infof("create file '%s'", fpath)
-	return
+
+	defer db.Close()
+
+	trans, ok := dbDriver[c.Option.Driver]
+	if !ok {
+		beeLogger.Log.Fatalf("Generating app code from '%s' database is not supported yet.", c.Option.Driver)
+		return
+	}
+
+	tb := getTableObject(mname, db, trans)
+
+	render := NewGenRender("models", utils.CamelCase(tb.Name), c.Option)
+
+	render.SetContext("modelStruct", tb.String())
+	render.SetContext("tableName", utils.SnakeString(render.Name))
+
+	// If table contains time field, import time.Time package
+	if tb.ImportTimePkg {
+		render.SetContext("timePkg", "\"time\"\n")
+		render.SetContext("importTimePkg", "import \"time\"\n")
+	}
+
+	render.Exec("model.go.tmpl")
 }
 
 func getStruct(structname, fields string) (string, bool, error) {

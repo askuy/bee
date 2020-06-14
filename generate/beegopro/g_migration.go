@@ -190,10 +190,10 @@ func NewDBDriver() DBDriver {
 // generateMigration generates migration file template for database schema update.
 // The generated file template consists of an up() method for updating schema and
 // a down() method for reverting the update.
-func (c *Container) renderMigration(mname, fields string) {
+func (c *Container) renderMigration(mname string, content ModelsContent) {
 	upsql := ""
 	downsql := ""
-	if fields != "" {
+	if content.Schema != "" {
 		dbMigrator := generate.NewDBDriver()
 		upsql = dbMigrator.GenerateCreateUp(mname)
 		downsql = dbMigrator.GenerateCreateDown(mname)

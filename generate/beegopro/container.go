@@ -16,79 +16,98 @@ var DefaultBeegoPro = &Container{
 	Option: Option{
 		Dsn:          "",
 		Driver:       "",
-		ProType:      "",
+		ProType:      "default",
+		ProVersion:   "v1",
 		EnableModule: "",
 		ApiPrefix:    "/",
 		BeegoPath:    system.CurrentDir,
-		Models:       make(map[string]string, 0),
+		Models:       make(map[string]ModelsContent, 0),
 		Url:          "git@github.com:beego-dev/bee-mod.git",
 		Branch:       "master",
 		GitPath:      system.BeegoHome + "/bee-mod",
 		Overwrite:    false,
 	},
-	BeegoJson: system.CurrentDir + "/beegopro.json",
-	CurPath:   system.CurrentDir,
-	Render:    make(map[string]ProRenderMap, 0),
+	BeegoJson:    system.CurrentDir + "/beegopro.json",
+	CurPath:      system.CurrentDir,
+	SingleRender: make(map[string]ProSingleRenderMap, 0),
+	GlobalRender: make(map[string]ProGlobalRenderMap, 0),
 }
 
 func init() {
 	// 兼容默认的生成
-	DefaultBeegoPro.Render["default"] = make(map[string]ProRender, 0)
-	DefaultBeegoPro.Render["default"]["models"] = DefaultBeegoPro.renderModel
-	DefaultBeegoPro.Render["default"]["controllers"] = DefaultBeegoPro.renderController
+	DefaultBeegoPro.SingleRender["default"] = make(map[string]ProSingleRender, 0)
+	DefaultBeegoPro.SingleRender["default"]["models"] = DefaultBeegoPro.renderModel
+	DefaultBeegoPro.SingleRender["default"]["controllers"] = DefaultBeegoPro.renderController
+	DefaultBeegoPro.SingleRender["default"]["routers"] = DefaultBeegoPro.renderRouter
+
+	//DefaultBeegoPro.GlobalRender["default"] = make(map[string]ProGlobalRender, 0)
+	//DefaultBeegoPro.GlobalRender["default"]["routers"] = DefaultBeegoPro.renderRouter
 
 	// Ant Design后端 + 前端
-	DefaultBeegoPro.Render["antDesign"] = make(map[string]ProRender, 0)
-	DefaultBeegoPro.Render["antDesign"]["models"] = DefaultBeegoPro.renderModel
-	DefaultBeegoPro.Render["antDesign"]["controllers"] = DefaultBeegoPro.renderController
+	DefaultBeegoPro.SingleRender["antDesign"] = make(map[string]ProSingleRender, 0)
+	DefaultBeegoPro.SingleRender["antDesign"]["models"] = DefaultBeegoPro.renderModel
+	DefaultBeegoPro.SingleRender["antDesign"]["controllers"] = DefaultBeegoPro.renderController
 
 	pongo2.RegisterFilter("lowerfirst", lwfirst)
 	pongo2.RegisterFilter("upperfirst", upperfirst)
 }
 
 type Container struct {
-	BeegoJson string
-	Fields    string
-	CurPath   string
-	Option    Option
-	Render    map[string]ProRenderMap
+	BeegoJson    string
+	Fields       string
+	CurPath      string
+	Option       Option
+	SingleRender map[string]ProSingleRenderMap
+	GlobalRender map[string]ProGlobalRenderMap
 }
 
 type Option struct {
-	Dsn           string            `json:"dsn"`
-	Driver        string            `json:"driver"`
-	ProType       string            `json:"proType"`
-	ApiPrefix     string            `json:"apiPrefix"`
-	EnableModule  string            `json:"enableModule"`
-	BeegoPath     string            `json:"beegoPath"`
-	AntDesignPath string            `json:"antDesignPath"`
-	Models        map[string]string `json:"models"`  // name => fields
-	Url           string            `json:"url"`     // 安装路径
-	Branch        string            `json:"branch"`  // 安装分支
-	GitPath       string            `json:"gitPath"` // git clone隐藏地址
-	Overwrite     bool              `json:"overwrite"`
+	Dsn           string                   `json:"dsn"`
+	Driver        string                   `json:"driver"`
+	ProType       string                   `json:"proType"`
+	ProVersion    string                   `json:"proVersion"`
+	ApiPrefix     string                   `json:"apiPrefix"`
+	EnableModule  string                   `json:"enableModule"`
+	BeegoPath     string                   `json:"beegoPath"`
+	AntDesignPath string                   `json:"antDesignPath"`
+	Models        map[string]ModelsContent `json:"models"`  // name => fields
+	Url           string                   `json:"url"`     // 安装路径
+	Branch        string                   `json:"branch"`  // 安装分支
+	GitPath       string                   `json:"gitPath"` // git clone隐藏地址
+	Overwrite     bool                     `json:"overwrite"`
 }
 
-type ProRender func(name, fields string) error // 渲染函数
+type ModelsContent struct {
+	Schema    string `json:"schema"`
+	SourceGen string `json:"sourceGen"`
+	ApiPrefix string `json:"apiPrefix"`
+}
 
-type ProRenderMap map[string]ProRender // 渲染模板map
+type ProSingleRender func(name string, content ModelsContent) error // 渲染单个表
+type ProGlobalRender func() error                                   // 渲染单个表
+
+type ProSingleRenderMap map[string]ProSingleRender // 渲染模板map
+type ProGlobalRenderMap map[string]ProGlobalRender // 渲染模板map
 
 // Generate generates beego pro for a given path.
-func (c *Container) Generate() {
-	if !utils.IsExist(c.BeegoJson) {
-		beeLogger.Log.Fatalf("beego pro json is not exist, beego json path: %s", c.BeegoJson)
-		return
-	}
+func (c *Container) Generate(flag bool) {
+	//
+	if flag {
+		if !utils.IsExist(c.BeegoJson) {
+			beeLogger.Log.Fatalf("beego pro json is not exist, beego json path: %s", c.BeegoJson)
+			return
+		}
 
-	content, err := ioutil.ReadFile(c.BeegoJson)
-	if err != nil {
-		beeLogger.Log.Fatalf("read beego pro error, err: %s", err.Error())
-		return
-	}
-	err = json.Unmarshal(content, &c.Option)
-	if err != nil {
-		beeLogger.Log.Fatalf("beego json unmarshal error, err: %s", err.Error())
-		return
+		content, err := ioutil.ReadFile(c.BeegoJson)
+		if err != nil {
+			beeLogger.Log.Fatalf("read beego pro error, err: %s", err.Error())
+			return
+		}
+		err = json.Unmarshal(content, &c.Option)
+		if err != nil {
+			beeLogger.Log.Fatalf("beego json unmarshal error, err: %s", err.Error())
+			return
+		}
 	}
 
 	absolutePath, err := filepath.Abs(c.Option.BeegoPath)
@@ -109,7 +128,7 @@ func (c *Container) Generate() {
 
 func (c *Container) render() {
 	arr := strings.Split(c.Option.EnableModule, ",")
-	moduleMap, moduleFlag := c.Render[c.Option.ProType]
+	moduleMap, moduleFlag := c.SingleRender[c.Option.ProType]
 	if !moduleFlag {
 		beeLogger.Log.Fatalf("beego json pro type not exist, pro type is: %s", c.Option.ProType)
 		return
@@ -122,15 +141,34 @@ func (c *Container) render() {
 			continue
 		}
 
-		// 找到需要的name和fields
-		for name, fields := range c.Option.Models {
-			err := render(name, fields)
+		// 找到需要的table name和fields
+		for name, content := range c.Option.Models {
+			err := render(name, content)
 			if err != nil {
 				beeLogger.Log.Fatalf("beego pro render error, err: %s", err.Error())
 			}
 		}
-
 	}
+
+	// global render
+	//globalModuleMap, globalModuleFlag := c.GlobalRender[c.Option.ProType]
+	//if !globalModuleFlag {
+	//	beeLogger.Log.Fatalf("beego json pro global type not exist, pro type is: %s", c.Option.ProType)
+	//	return
+	//}
+	//
+	//for _, moduleName := range arr {
+	//	// 找到渲染函数
+	//	globalRender, flag := globalModuleMap[moduleName]
+	//	if !flag {
+	//		continue
+	//	}
+	//
+	//	err := globalRender()
+	//	if err != nil {
+	//		beeLogger.Log.Fatalf("beego pro render error, err: %s", err.Error())
+	//	}
+	//}
 
 }
 

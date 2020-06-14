@@ -31,7 +31,7 @@ var (
 )
 
 func main() {
-	fmt.Println("hello bee")
+	fmt.Println("hello bee 2")
 	currentpath, _ := os.Getwd()
 	if workspace != "" {
 		currentpath = workspace

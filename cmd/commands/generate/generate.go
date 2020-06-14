@@ -94,7 +94,7 @@ func GenerateCode(cmd *commands.Command, args []string) int {
 	gcmd := args[0]
 	switch gcmd {
 	case "beegopro":
-		beegopro.DefaultBeegoPro.Generate()
+		beegopro.DefaultBeegoPro.Generate(true)
 	case "scaffold":
 		scaffold(cmd, args, currpath)
 	case "docs":

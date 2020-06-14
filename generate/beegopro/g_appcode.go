@@ -342,6 +342,23 @@ func (*MysqlDB) GetTableNames(db *sql.DB) (tables []string) {
 }
 
 // getTableObjects process each table name
+func getTableObject(tableName string, db *sql.DB, dbTransformer DbTransformer) (table *Table) {
+	// if a table has a composite pk or doesn't have pk, we can't use it yet
+	// these tables will be put into blacklist so that other struct will not
+	// reference it.
+	blackList := make(map[string]bool)
+	// process constraints information for each table, also gather blacklisted table names
+	// create a table struct
+	table = new(Table)
+	table.Name = tableName
+	table.Fk = make(map[string]*ForeignKey)
+	dbTransformer.GetConstraints(db, table, blackList)
+	// process columns, ignoring blacklisted tables
+	dbTransformer.GetColumns(db, table, blackList)
+	return
+}
+
+// getTableObjects process each table name
 func getTableObjects(tableNames []string, db *sql.DB, dbTransformer DbTransformer) (tables []*Table) {
 	// if a table has a composite pk or doesn't have pk, we can't use it yet
 	// these tables will be put into blacklist so that other struct will not
