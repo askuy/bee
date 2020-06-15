@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"github.com/beego/bee/generate/beegopro"
 	"strings"
 
 	"github.com/beego/bee/cmd/commands/migrate"
@@ -13,7 +14,26 @@ func GenerateScaffold(sname, fields, currpath, driver, conn string) {
 
 	// Generate the model
 	if utils.AskForConfirmation() {
-		GenerateModel(sname, fields, currpath)
+		schemas := make([]beegopro.Schema, 0)
+		fds := strings.Split(fields, ",")
+		for _, v := range fds {
+			kv := strings.SplitN(v, ":", 2)
+			if len(kv) != 2 {
+				beeLogger.Log.Error("Fields format is wrong. Should be: key:type,key:type " + v)
+				return
+			}
+			schemas = append(schemas, beegopro.Schema{
+				Name: kv[0],
+				Type: kv[1],
+			})
+		}
+
+		beegopro.DefaultBeegoPro.TextRenderModel(sname, beegopro.ModelsContent{
+			Schema:    schemas,
+			SourceGen: "text",
+			ApiPrefix: "/",
+		})
+		//GenerateModel(sname, fields, currpath)
 	}
 
 	// Generate the controller

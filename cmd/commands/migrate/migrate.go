@@ -15,6 +15,7 @@ package migrate
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"os/exec"
 	"path"
@@ -292,7 +293,9 @@ func writeMigrationSourceFile(dir, source, driver, connStr string, latestTime in
 	changeDir(dir)
 	if f, err := os.OpenFile(source, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0666); err != nil {
 		beeLogger.Log.Fatalf("Could not create file: %s", err)
+		return
 	} else {
+		fmt.Println(f)
 		content := strings.Replace(MigrationMainTPL, "{{DBDriver}}", driver, -1)
 		content = strings.Replace(content, "{{DriverRepo}}", driverImportStatement(driver), -1)
 		content = strings.Replace(content, "{{ConnStr}}", connStr, -1)
@@ -309,7 +312,16 @@ func writeMigrationSourceFile(dir, source, driver, connStr string, latestTime in
 // buildMigrationBinary changes directory to database/migrations folder and go-build the source
 func buildMigrationBinary(dir, binary string) {
 	changeDir(dir)
-	cmd := exec.Command("go", "build", "-o", binary)
+	cmd := exec.Command("go", "mod", "init")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		beeLogger.Log.Errorf("Could not go mod init: %s", err)
+		formatShellErrOutput(string(out))
+		removeTempFile(dir, binary)
+		removeTempFile(dir, binary+".go")
+		os.Exit(2)
+	}
+
+	cmd = exec.Command("go", "build", "-o", binary)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		beeLogger.Log.Errorf("Could not build migration binary: %s", err)
 		formatShellErrOutput(string(out))
@@ -325,7 +337,7 @@ func runMigrationBinary(dir, binary string) {
 	cmd := exec.Command("./" + binary)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		formatShellOutput(string(out))
-		beeLogger.Log.Errorf("Could not run migration binary: %s", err)
+		beeLogger.Log.Errorf("Could not run migration binary2: %s", err)
 		removeTempFile(dir, binary)
 		removeTempFile(dir, binary+".go")
 		os.Exit(2)

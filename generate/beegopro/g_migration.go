@@ -15,33 +15,29 @@
 package beegopro
 
 import (
+	"errors"
 	"fmt"
-	"github.com/beego/bee/generate"
-	"os"
-	"path"
+	"github.com/beego/bee/cmd/commands/migrate"
 	"strings"
 	"time"
 
 	"github.com/beego/bee/logger"
-	"github.com/beego/bee/logger/colors"
 	"github.com/beego/bee/utils"
 )
 
 const (
-	MPath       = "migrations"
 	MDateFormat = "20060102_150405"
-	DBPath      = "database"
 )
 
 type DBDriver interface {
-	GenerateCreateUp(tableName string, fields string) string
+	GenerateCreateUp(tableName string, schemas []Schema) string
 	GenerateCreateDown(tableName string) string
 }
 
 type mysqlDriver struct{}
 
-func (m mysqlDriver) GenerateCreateUp(tableName string, fields string) string {
-	upsql := `m.SQL("CREATE TABLE ` + tableName + "(" + m.generateSQLFromFields(fields) + `)");`
+func (m mysqlDriver) GenerateCreateUp(tableName string, schemas []Schema) string {
+	upsql := `m.SQL("CREATE TABLE ` + tableName + "(" + m.generateSQLFromSchemas(schemas) + `)");`
 	return upsql
 }
 
@@ -50,27 +46,21 @@ func (m mysqlDriver) GenerateCreateDown(tableName string) string {
 	return downsql
 }
 
-func (m mysqlDriver) generateSQLFromFields(fields string) string {
+func (m mysqlDriver) generateSQLFromSchemas(schemas []Schema) string {
 	sql, tags := "", ""
-	fds := strings.Split(fields, ",")
-	for i, v := range fds {
-		kv := strings.SplitN(v, ":", 2)
-		if len(kv) != 2 {
-			beeLogger.Log.Error("Fields format is wrong. Should be: key:type,key:type " + v)
-			return ""
-		}
-		typ, tag := m.getSQLType(kv[1])
+	for i, v := range schemas {
+		typ, tag := m.getSQLType(v.Type)
 		if typ == "" {
-			beeLogger.Log.Error("Fields format is wrong. Should be: key:type,key:type " + v)
+			beeLogger.Log.Error("Fields format is wrong. Should be: key:type,key:type " + v.Type)
 			return ""
 		}
-		if i == 0 && strings.ToLower(kv[0]) != "id" {
+		if i == 0 && strings.ToLower(v.Name) != "id" {
 			sql += "`id` int(11) NOT NULL AUTO_INCREMENT,"
 			tags = tags + "PRIMARY KEY (`id`),"
 		}
-		sql += "`" + utils.SnakeString(kv[0]) + "` " + typ + ","
+		sql += "`" + utils.SnakeString(v.Name) + "` " + typ + ","
 		if tag != "" {
-			tags = tags + fmt.Sprintf(tag, "`"+utils.SnakeString(kv[0])+"`") + ","
+			tags = tags + fmt.Sprintf(tag, "`"+utils.SnakeString(v.Name)+"`") + ","
 		}
 	}
 	sql = strings.TrimRight(sql+tags, ",")
@@ -109,8 +99,8 @@ func (m mysqlDriver) getSQLType(ktype string) (tp, tag string) {
 
 type postgresqlDriver struct{}
 
-func (m postgresqlDriver) GenerateCreateUp(tableName string, fields string) string {
-	upsql := `m.SQL("CREATE TABLE ` + tableName + "(" + m.generateSQLFromFields(fields) + `)");`
+func (m postgresqlDriver) GenerateCreateUp(tableName string, schemas []Schema) string {
+	upsql := `m.SQL("CREATE TABLE ` + tableName + "(" + m.generateSQLFromSchemas(schemas) + `)");`
 	return upsql
 }
 
@@ -119,26 +109,20 @@ func (m postgresqlDriver) GenerateCreateDown(tableName string) string {
 	return downsql
 }
 
-func (m postgresqlDriver) generateSQLFromFields(fields string) string {
+func (m postgresqlDriver) generateSQLFromSchemas(schemas []Schema) string {
 	sql, tags := "", ""
-	fds := strings.Split(fields, ",")
-	for i, v := range fds {
-		kv := strings.SplitN(v, ":", 2)
-		if len(kv) != 2 {
-			beeLogger.Log.Error("Fields format is wrong. Should be: key:type,key:type " + v)
-			return ""
-		}
-		typ, tag := m.getSQLType(kv[1])
+	for i, v := range schemas {
+		typ, tag := m.getSQLType(v.Type)
 		if typ == "" {
-			beeLogger.Log.Error("Fields format is wrong. Should be: key:type,key:type " + v)
+			beeLogger.Log.Error("Fields format is wrong. Should be: key:type,key:type " + v.Type)
 			return ""
 		}
-		if i == 0 && strings.ToLower(kv[0]) != "id" {
+		if i == 0 && strings.ToLower(v.Name) != "id" {
 			sql += "id serial primary key,"
 		}
-		sql += utils.SnakeString(kv[0]) + " " + typ + ","
+		sql += utils.SnakeString(v.Name) + " " + typ + ","
 		if tag != "" {
-			tags = tags + fmt.Sprintf(tag, utils.SnakeString(kv[0])) + ","
+			tags = tags + fmt.Sprintf(tag, utils.SnakeString(v.Name)) + ","
 		}
 	}
 	if tags != "" {
@@ -175,8 +159,8 @@ func (m postgresqlDriver) getSQLType(ktype string) (tp, tag string) {
 	return "", ""
 }
 
-func NewDBDriver() DBDriver {
-	switch SQLDriver {
+func NewDBDriver(sqlDriver string) DBDriver {
+	switch sqlDriver {
 	case "mysql":
 		return mysqlDriver{}
 	case "postgres":
@@ -190,110 +174,36 @@ func NewDBDriver() DBDriver {
 // generateMigration generates migration file template for database schema update.
 // The generated file template consists of an up() method for updating schema and
 // a down() method for reverting the update.
-func (c *Container) renderMigration(mname string, content ModelsContent) {
-	upsql := ""
-	downsql := ""
-	if content.Schema != "" {
-		dbMigrator := generate.NewDBDriver()
-		upsql = dbMigrator.GenerateCreateUp(mname)
-		downsql = dbMigrator.GenerateCreateDown(mname)
+func (c *Container) renderMigration(modelName string, content ModelsContent) (err error) {
+	switch content.SourceGen {
+	case "text":
+		c.textRenderMigration(modelName, content)
+		return
+	case "database":
+		return
 	}
-
-	w := colors.NewColorWriter(os.Stdout)
-	migrationFilePath := path.Join(c.CurPath, DBPath, MPath)
-	if _, err := os.Stat(migrationFilePath); os.IsNotExist(err) {
-		// create migrations directory
-		if err := os.MkdirAll(migrationFilePath, 0777); err != nil {
-			beeLogger.Log.Fatalf("Could not create migration directory: %s", err)
-		}
-	}
-	// create file
-	today := time.Now().Format(MDateFormat)
-	fpath := path.Join(migrationFilePath, fmt.Sprintf("%s_%s.go", today, mname))
-	if f, err := os.OpenFile(fpath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0666); err == nil {
-		defer utils.CloseFile(f)
-		ddlSpec := ""
-		spec := ""
-		up := ""
-		down := ""
-		if DDL != "" {
-			ddlSpec = "m.ddlSpec()"
-			switch strings.Title(DDL.String()) {
-			case "Create":
-				spec = strings.Replace(DDLSpecCreate, "{{StructName}}", utils.CamelCase(mname)+"_"+today, -1)
-			case "Alter":
-				spec = strings.Replace(DDLSpecAlter, "{{StructName}}", utils.CamelCase(mname)+"_"+today, -1)
-			}
-			spec = strings.Replace(spec, "{{tableName}}", mname, -1)
-		} else {
-			up = strings.Replace(MigrationUp, "{{UpSQL}}", upsql, -1)
-			up = strings.Replace(up, "{{StructName}}", utils.CamelCase(mname)+"_"+today, -1)
-			down = strings.Replace(MigrationDown, "{{DownSQL}}", downsql, -1)
-			down = strings.Replace(down, "{{StructName}}", utils.CamelCase(mname)+"_"+today, -1)
-		}
-
-		header := strings.Replace(MigrationHeader, "{{StructName}}", utils.CamelCase(mname)+"_"+today, -1)
-		header = strings.Replace(header, "{{ddlSpec}}", ddlSpec, -1)
-		header = strings.Replace(header, "{{CurrTime}}", today, -1)
-		f.WriteString(header + spec + up + down)
-		// Run 'gofmt' on the generated source code
-		utils.FormatSourceCode(fpath)
-		fmt.Fprintf(w, "\t%s%screate%s\t %s%s\n", "\x1b[32m", "\x1b[1m", "\x1b[21m", fpath, "\x1b[0m")
-	} else {
-		beeLogger.Log.Fatalf("Could not create migration file: %s", err)
-	}
+	err = errors.New("not support source gen, source gen is " + content.SourceGen)
+	return
 }
 
-const (
-	MigrationHeader = `package main
-						import (
-							"github.com/astaxie/beego/migration"
-						)
+func (c *Container) textRenderMigration(mname string, content ModelsContent) {
+	upsql := ""
+	downsql := ""
+	if len(content.Schema) != 0 {
+		dbMigrator := NewDBDriver(c.Option.Driver)
+		upsql = dbMigrator.GenerateCreateUp(mname, content.Schema)
+		downsql = dbMigrator.GenerateCreateDown(mname)
+	}
+	today := time.Now().Format(MDateFormat)
+	render := NewRenderGo("database", "migrations/"+fmt.Sprintf("%s_%s", today, mname), c.Option)
+	render.SetContext("UpSQL", upsql)
+	render.SetContext("StructName", utils.CamelCase(mname)+"_"+today)
+	render.SetContext("DownSQL", downsql)
+	render.SetContext("ddlSpec", "")
+	render.SetContext("CurrTime", today)
 
-						// DO NOT MODIFY
-						type {{StructName}} struct {
-							migration.Migration
-						}
+	render.Exec("migrations/migrations.go.tmpl")
 
-						// DO NOT MODIFY
-						func init() {
-							m := &{{StructName}}{}
-							m.Created = "{{CurrTime}}"
-							{{ddlSpec}}
-							migration.Register("{{StructName}}", m)
-						}
-					   `
-
-	DDLSpecCreate = `
-				/*
-				refer beego/migration/doc.go
-				*/
-				func(m *{{StructName}}) ddlSpec(){
-				m.CreateTable("{{tableName}}", "InnoDB", "utf8")
-				m.PriCol("id").SetAuto(true).SetNullable(false).SetDataType("INT(10)").SetUnsigned(true)
-
-				}
-				`
-	DDLSpecAlter = `
-				/*
-				refer beego/migration/doc.go
-				*/
-				func(m *{{StructName}}) ddlSpec(){
-				m.AlterTable("{{tableName}}")
-
-				}
-				`
-	MigrationUp = `
-				// Run the migrations
-				func (m *{{StructName}}) Up() {
-					// use m.SQL("CREATE TABLE ...") to make schema update
-					{{UpSQL}}
-				}`
-	MigrationDown = `
-				// Reverse the migrations
-				func (m *{{StructName}}) Down() {
-					// use m.SQL("DROP TABLE ...") to reverse schema update
-					{{DownSQL}}
-				}
-				`
-)
+	migrate.MigrateUpdate(c.Option.BeegoPath, c.Option.Driver, c.Option.Dsn, "")
+	return
+}

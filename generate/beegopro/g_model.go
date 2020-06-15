@@ -31,7 +31,7 @@ import (
 func (c *Container) renderModel(modelName string, content ModelsContent) (err error) {
 	switch content.SourceGen {
 	case "text":
-		c.textRenderModel(modelName, content)
+		c.TextRenderModel(modelName, content)
 		return
 	case "database":
 		c.databaseRenderModel(modelName, content)
@@ -41,7 +41,7 @@ func (c *Container) renderModel(modelName string, content ModelsContent) (err er
 	return
 }
 
-func (c *Container) textRenderModel(mname string, content ModelsContent) {
+func (c *Container) TextRenderModel(mname string, content ModelsContent) {
 	render := NewRenderGo("models", mname, c.Option)
 	modelStruct, hastime, err := getStruct(render.Name, content.Schema)
 	if err != nil {
@@ -90,33 +90,26 @@ func (c *Container) databaseRenderModel(mname string, content ModelsContent) {
 	render.Exec("model.go.tmpl")
 }
 
-func getStruct(structname, fields string) (string, bool, error) {
-	if fields == "" {
-		return "", false, errors.New("fields cannot be empty")
+func getStruct(structname string, schema []Schema) (string, bool, error) {
+	if len(schema) == 0 {
+		return "", false, errors.New("schema cannot be empty")
 	}
-
 	hastime := false
 	structStr := "type " + structname + " struct{\n"
-	fds := strings.Split(fields, ",")
-	for i, v := range fds {
-		kv := strings.SplitN(v, ":", 2)
-		if len(kv) != 2 {
-			return "", false, errors.New("the fields format is wrong. Should be key:type,key:type " + v)
-		}
-
-		typ, tag, hastimeinner := getType(kv[1])
+	for i, v := range schema {
+		typ, tag, hastimeinner := getType(v.Type)
 		if typ == "" {
-			return "", false, errors.New("the fields format is wrong. Should be key:type,key:type " + v)
+			return "", false, errors.New("the fields format is wrong. Should be key:type,key:type " + v.Type)
 		}
 
-		if i == 0 && strings.ToLower(kv[0]) != "id" {
+		if i == 0 && strings.ToLower(v.Name) != "id" {
 			structStr = structStr + "Id     int64     `orm:\"auto\"`\n"
 		}
 
 		if hastimeinner {
 			hastime = true
 		}
-		structStr = structStr + utils.CamelString(kv[0]) + "       " + typ + "     " + tag + "\n"
+		structStr = structStr + utils.CamelString(v.Name) + "       " + typ + "     " + tag + "\n"
 	}
 	structStr += "}\n"
 	return structStr, hastime, nil

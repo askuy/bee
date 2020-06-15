@@ -22,4 +22,3 @@ var SQLDriver utils.DocValue
 var Level utils.DocValue
 var Tables utils.DocValue
 var Fields utils.DocValue
-var DDL utils.DocValue

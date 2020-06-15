@@ -31,7 +31,7 @@ import (
 )
 
 func GenerateModel(mname, fields, currpath string) {
-	var render = pongo2render.NewRender("/home/www/server/opensource/bee-mod/default")
+	var render = pongo2render.NewRender("/home/www/server/opensource/bee-mod/default/v1/go/models")
 
 	w := colors.NewColorWriter(os.Stdout)
 
@@ -61,7 +61,7 @@ func GenerateModel(mname, fields, currpath string) {
 
 	ctx := pongo2.Context{
 		"packageName": packageName,
-		"modelName":   modelName,
+		"name":        modelName,
 		"modelStruct": modelStruct,
 	}
 	fpath := path.Join(fp, strings.ToLower(modelName)+".go")
@@ -72,7 +72,7 @@ func GenerateModel(mname, fields, currpath string) {
 		ctx["timePkg"] = ""
 	}
 
-	buf, err := render.Template("models/TABLE_NAME.go.tmpl").Execute(ctx)
+	buf, err := render.Template("model.go.tmpl").Execute(ctx)
 	if err != nil {
 		beeLogger.Log.Fatalf("Could not create the model render tmpl: %s", err)
 	}

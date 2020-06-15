@@ -22,19 +22,25 @@ func (c *Container) renderAntList(modelName string, content ModelsContent) (err 
 
 func (c *Container) textRenderAntList(mname string, content ModelsContent) {
 	render := NewRenderAnt("list", mname, c.Option)
-	modelStruct, hastime, err := getStruct(render.Name, content.Schema)
-	if err != nil {
-		beeLogger.Log.Fatalf("Could not generate the model struct: %s", err)
-	}
-	render.SetContext("modelStruct", modelStruct)
-	render.SetContext("tableName", utils.SnakeString(render.Name))
-	if hastime {
-		render.SetContext("timePkg", `"time"`)
-	} else {
-		render.SetContext("timePkg", ``)
+
+	columns := make([]AntColumn, 0)
+	for _, column := range content.Schema {
+		title := column.Comment
+		if title == "" {
+			title = column.Name
+		}
+		columns = append(columns, AntColumn{
+			Title: title,
+			Key:   column.Name,
+		})
 	}
 
-	render.Exec("model.go.tmpl")
+	render.SetContext("columns", columns)
+	render.SetContext("apiList", c.Option.ApiPrefix+"/"+mname)
+	render.SetContext("pageCreate", "/"+mname+"/create")
+	render.SetContext("tableName", utils.SnakeString(render.Name))
+
+	render.Exec("list.tsx.tmpl")
 }
 
 func (c *Container) databaseRenderAntList(mname string, content ModelsContent) {
@@ -58,7 +64,6 @@ func (c *Container) databaseRenderAntList(mname string, content ModelsContent) {
 	render := NewRenderAnt("list", mname, c.Option)
 
 	columns := make([]AntColumn, 0)
-
 	for _, column := range tb.Columns {
 		title := column.Tag.Comment
 		if title == "" {

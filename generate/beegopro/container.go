@@ -49,6 +49,7 @@ func init() {
 	DefaultBeegoPro.SingleRender["antDesign"]["models"] = DefaultBeegoPro.renderModel
 	DefaultBeegoPro.SingleRender["antDesign"]["controllers"] = DefaultBeegoPro.renderController
 	DefaultBeegoPro.SingleRender["antDesign"]["routers"] = DefaultBeegoPro.renderRouter
+	DefaultBeegoPro.SingleRender["antDesign"]["migrations"] = DefaultBeegoPro.renderMigration
 	DefaultBeegoPro.SingleRender["antDesign"]["antList"] = DefaultBeegoPro.renderAntList
 
 	pongo2.RegisterFilter("lowerfirst", lwfirst)
@@ -81,9 +82,15 @@ type Option struct {
 }
 
 type ModelsContent struct {
-	Schema    string `json:"schema"`
-	SourceGen string `json:"sourceGen"`
-	ApiPrefix string `json:"apiPrefix"`
+	Schema    []Schema `json:"schema"`
+	SourceGen string   `json:"sourceGen"`
+	ApiPrefix string   `json:"apiPrefix"`
+}
+
+type Schema struct {
+	Name    string `json:"name"`    // mysql name
+	Type    string `json:"type"`    // mysql type
+	Comment string `json:"comment"` // mysql comment
 }
 
 type ProSingleRender func(name string, content ModelsContent) error // 渲染单个表

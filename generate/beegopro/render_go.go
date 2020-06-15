@@ -7,7 +7,6 @@ import (
 	"github.com/beego/bee/utils"
 	"github.com/flosch/pongo2"
 	"github.com/smartwalle/pongo2render"
-	"go/format"
 	"io/ioutil"
 	"os"
 	"path"
@@ -40,10 +39,10 @@ func NewRenderGo(packageName string, name string, option Option) *RenderGo {
 	// render path
 	obj.Render = pongo2render.NewRender(option.GitPath + "/" + option.ProType + "/" + option.ProVersion + "/" + language + "/" + obj.PackageName)
 
-	if p != "" {
-		i := strings.LastIndex(p[:len(p)-1], "/")
-		packageName = p[i+1 : len(p)-1]
-	}
+	//if p != "" {
+	//	i := strings.LastIndex(p[:len(p)-1], "/")
+	//	packageName = p[i+1 : len(p)-1]
+	//}
 
 	beeLogger.Log.Infof("Using '%s' as name from %s", title, obj.PackageName)
 	beeLogger.Log.Infof("Using '%s' as package name from %s", packageName, obj.PackageName)
@@ -54,6 +53,7 @@ func NewRenderGo(packageName string, name string, option Option) *RenderGo {
 		beeLogger.Log.Fatalf("Could not create the controllers directory: %s", err)
 	}
 
+	fmt.Println("fp------>", fp)
 	obj.FlushFile = path.Join(fp, strings.ToLower(title)+".go")
 	obj.PkgPath = getPackagePath(obj.Option.BeegoPath)
 
@@ -117,13 +117,13 @@ func (c *RenderGo) write(filename string, buf string) (err error) {
 	}
 
 	// 格式化代码
-	bts, err := format.Source([]byte(buf))
-	if err != nil {
-		err = errors.New("format buf error " + err.Error())
-		return
-	}
+	//bts, err := format.Source([]byte(buf))
+	//if err != nil {
+	//	err = errors.New("format buf error " + err.Error())
+	//	return
+	//}
 
-	err = ioutil.WriteFile(filename, bts, 0644)
+	err = ioutil.WriteFile(filename, []byte(buf), 0644)
 	if err != nil {
 		err = errors.New("write write file " + err.Error())
 		return
