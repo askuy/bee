@@ -51,6 +51,7 @@ func init() {
 	DefaultBeegoPro.SingleRender["antDesign"]["routers"] = DefaultBeegoPro.renderRouter
 	DefaultBeegoPro.SingleRender["antDesign"]["migrations"] = DefaultBeegoPro.renderMigration
 	DefaultBeegoPro.SingleRender["antDesign"]["antList"] = DefaultBeegoPro.renderAntList
+	DefaultBeegoPro.SingleRender["antDesign"]["antForm"] = DefaultBeegoPro.renderAntForm
 
 	pongo2.RegisterFilter("lowerfirst", lwfirst)
 	pongo2.RegisterFilter("upperfirst", upperfirst)

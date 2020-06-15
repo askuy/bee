@@ -103,7 +103,7 @@ func getStruct(structname string, schema []Schema) (string, bool, error) {
 		}
 
 		if i == 0 && strings.ToLower(v.Name) != "id" {
-			structStr = structStr + "Id     int64     `orm:\"auto\"`\n"
+			structStr = structStr + "Id     int     `orm:\"auto\"`\n"
 		}
 
 		if hastimeinner {

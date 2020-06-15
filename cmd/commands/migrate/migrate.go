@@ -166,6 +166,8 @@ func migrate(goal, currpath, driver, connStr, dir string) {
 	runMigrationBinary(dir, binary)
 	removeTempFile(dir, source)
 	removeTempFile(dir, binary)
+	removeTempFile(dir, "go.mod")
+	removeTempFile(dir, "go.sum")
 }
 
 // checkForSchemaUpdateTable checks the existence of migrations table.

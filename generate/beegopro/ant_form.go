@@ -7,22 +7,20 @@ import (
 	"github.com/beego/bee/utils"
 )
 
-func (c *Container) renderAntList(modelName string, content ModelsContent) (err error) {
+func (c *Container) renderAntForm(modelName string, content ModelsContent) (err error) {
 	switch content.SourceGen {
 	case "text":
-		c.textRenderAntList(modelName, content)
+		c.textRenderAntForm(modelName, content)
 		return
 	case "database":
-		c.databaseRenderAntList(modelName, content)
+		c.databaseRenderAntForm(modelName, content)
 		return
 	}
 	err = errors.New("not support source gen, source gen is " + content.SourceGen)
 	return
 }
 
-func (c *Container) textRenderAntList(mname string, content ModelsContent) {
-	render := NewRenderAnt("list", mname, c.Option)
-
+func (c *Container) textRenderAntForm(mname string, content ModelsContent) {
 	columns := make([]AntColumn, 0)
 	for _, column := range content.Schema {
 		title := column.Comment
@@ -35,16 +33,29 @@ func (c *Container) textRenderAntList(mname string, content ModelsContent) {
 		})
 	}
 
+	render := NewRenderAnt("formconfig", mname, c.Option)
 	render.SetContext("columns", columns)
 	render.SetContext("apiUrl", c.Option.ApiPrefix+"/"+mname)
 	render.SetContext("pageCreate", "/"+mname+"/create")
-	render.SetContext("pageUpdate", "/"+mname+"/update")
 	render.SetContext("tableName", utils.SnakeString(render.Name))
+	render.Exec("formconfig.tsx.tmpl")
 
-	render.Exec("list.tsx.tmpl")
+	render = NewRenderAnt("create", mname, c.Option)
+	render.SetContext("columns", columns)
+	render.SetContext("apiUrl", c.Option.ApiPrefix+"/"+mname)
+	render.SetContext("tableName", utils.SnakeString(render.Name))
+	render.Exec("create.tsx.tmpl")
+
+	render = NewRenderAnt("update", mname, c.Option)
+	render.SetContext("columns", columns)
+	render.SetContext("apiUrl", c.Option.ApiPrefix+"/"+mname)
+	render.SetContext("pageCreate", "/"+mname+"/create")
+	render.SetContext("tableName", utils.SnakeString(render.Name))
+	render.Exec("update.tsx.tmpl")
+
 }
 
-func (c *Container) databaseRenderAntList(mname string, content ModelsContent) {
+func (c *Container) databaseRenderAntForm(mname string, content ModelsContent) {
 	// todo uniform sql open
 	db, err := sql.Open(c.Option.Driver, c.Option.Dsn)
 	if err != nil {
@@ -82,9 +93,4 @@ func (c *Container) databaseRenderAntList(mname string, content ModelsContent) {
 	render.SetContext("tableName", utils.SnakeString(render.Name))
 
 	render.Exec("list.tsx.tmpl")
-}
-
-type AntColumn struct {
-	Title string `json:"title"`
-	Key   string `json:"key"`
 }
