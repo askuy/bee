@@ -1,4 +1,4 @@
-module github.com/askuy/bee
+module github.com/beego/bee
 
 go 1.13
 
