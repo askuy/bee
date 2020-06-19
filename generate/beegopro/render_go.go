@@ -7,6 +7,7 @@ import (
 	"github.com/beego/bee/utils"
 	"github.com/flosch/pongo2"
 	"github.com/smartwalle/pongo2render"
+	"go/format"
 	"io/ioutil"
 	"os"
 	"path"
@@ -23,6 +24,7 @@ type RenderGo struct {
 	PackageName string
 	FlushFile   string
 	PkgPath     string
+	TmplPath    string
 }
 
 func NewRenderGo(packageName string, name string, option Option) *RenderGo {
@@ -35,9 +37,10 @@ func NewRenderGo(packageName string, name string, option Option) *RenderGo {
 		Option:      option,
 		Name:        title,
 		PackageName: packageName,
+		TmplPath:    option.GitPath + "/" + option.ProType + "/" + option.ProVersion + "/" + language + "/" + packageName,
 	}
 	// render path
-	obj.Render = pongo2render.NewRender(option.GitPath + "/" + option.ProType + "/" + option.ProVersion + "/" + language + "/" + obj.PackageName)
+	obj.Render = pongo2render.NewRender(obj.TmplPath)
 
 	//if p != "" {
 	//	i := strings.LastIndex(p[:len(p)-1], "/")
@@ -53,7 +56,6 @@ func NewRenderGo(packageName string, name string, option Option) *RenderGo {
 		beeLogger.Log.Fatalf("Could not create the controllers directory: %s", err)
 	}
 
-	fmt.Println("fp------>", fp)
 	obj.FlushFile = path.Join(fp, strings.ToLower(title)+".go")
 	obj.PkgPath = getPackagePath(obj.Option.BeegoPath)
 
@@ -88,25 +90,44 @@ func (r *RenderGo) Exec(name string) {
 
 // write 写bytes到文件
 func (c *RenderGo) write(filename string, buf string) (err error) {
-	if !c.Option.Overwrite && utils.IsExist(filename) {
-		err = errors.New("file is exist, path is " + filename)
+	// 不允许覆盖
+	if utils.IsExist(filename) && !isNeedGoOverwrite(filename) {
 		return
 	}
 
-	if c.Option.Overwrite && utils.IsExist(filename) {
-		bakName := fmt.Sprintf("%s.%s.bak", filename, time.Now().Format("2006.01.02.15.04.05"))
-		beeLogger.Log.Infof("bak file '%s'", bakName)
-		if err := os.Rename(filename, bakName); err != nil {
-			err = errors.New("file is bak error, path is " + bakName)
-			return err
-		}
-	}
+	//overwrite := false
+	//if utils.IsExist(filename) && isNeedGoOverwrite(filename) {
+	//	overwrite = true
+	//}
+	//
+	//if !c.Option.Overwrite && utils.IsExist(filename) {
+	//	err = errors.New("file is exist, path is " + filename)
+	//	return
+	//}
 
 	filePath := path.Dir(filename)
 	err = createPath(filePath)
 	if err != nil {
 		err = errors.New("write create path " + err.Error())
 		return
+	}
+
+	filePathBak := filePath + "/bak"
+	err = createPath(filePathBak)
+	if err != nil {
+		err = errors.New("write create path bak " + err.Error())
+		return
+	}
+
+	name := path.Base(filename)
+
+	if utils.IsExist(filename) {
+		bakName := fmt.Sprintf("%s/%s.%s.bak", filePathBak, name, time.Now().Format("2006.01.02.15.04.05"))
+		beeLogger.Log.Infof("bak file '%s'", bakName)
+		if err := os.Rename(filename, bakName); err != nil {
+			err = errors.New("file is bak error, path is " + bakName)
+			return err
+		}
 	}
 
 	file, err := os.Create(filename)
@@ -117,13 +138,13 @@ func (c *RenderGo) write(filename string, buf string) (err error) {
 	}
 
 	// 格式化代码
-	//bts, err := format.Source([]byte(buf))
-	//if err != nil {
-	//	err = errors.New("format buf error " + err.Error())
-	//	return
-	//}
+	bts, err := format.Source([]byte(buf))
+	if err != nil {
+		err = errors.New("format buf error " + err.Error())
+		return
+	}
 
-	err = ioutil.WriteFile(filename, []byte(buf), 0644)
+	err = ioutil.WriteFile(filename, bts, 0644)
 	if err != nil {
 		err = errors.New("write write file " + err.Error())
 		return

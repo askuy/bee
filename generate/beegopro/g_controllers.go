@@ -17,23 +17,29 @@ package beegopro
 import (
 	"database/sql"
 	"errors"
-	"path"
-	"strings"
-
 	beeLogger "github.com/beego/bee/logger"
 	"github.com/beego/bee/utils"
+	"path"
+	"strings"
 )
+
 
 func (c *Container) renderController(modelName string, content ModelsContent) (err error) {
 	switch content.SourceGen {
 	case "text":
 		c.textRenderController(modelName, content)
-		return
 	case "database":
 		c.databaseRenderController(modelName, content)
+	default:
+		err = errors.New("not support source gen, source gen is " + content.SourceGen)
 		return
 	}
-	err = errors.New("not support source gen, source gen is " + content.SourceGen)
+	c.ControllerOnce.Do(func() {
+		render := NewRenderGo("controllers", "bee_default_controller", c.Option)
+		if utils.IsExist(render.TmplPath+"/"+BeeDefaultControllerTmpl) {
+			render.Exec(BeeDefaultControllerTmpl)
+		}
+	})
 	return
 }
 

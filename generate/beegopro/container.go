@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -28,10 +29,12 @@ var DefaultBeegoPro = &Container{
 		GitPath:       system.BeegoHome + "/bee-mod",
 		Overwrite:     false,
 	},
-	BeegoJson:    system.CurrentDir + "/beegopro.json",
-	CurPath:      system.CurrentDir,
-	SingleRender: make(map[string]ProSingleRenderMap, 0),
-	GlobalRender: make(map[string]ProGlobalRenderMap, 0),
+	BeegoJson:      system.CurrentDir + "/beegopro.json",
+	CurPath:        system.CurrentDir,
+	SingleRender:   make(map[string]ProSingleRenderMap, 0),
+	GlobalRender:   make(map[string]ProGlobalRenderMap, 0),
+	ControllerOnce: &sync.Once{},
+	ModelOnce:      &sync.Once{},
 }
 
 func init() {
@@ -58,12 +61,14 @@ func init() {
 }
 
 type Container struct {
-	BeegoJson    string
-	Fields       string
-	CurPath      string
-	Option       Option
-	SingleRender map[string]ProSingleRenderMap
-	GlobalRender map[string]ProGlobalRenderMap
+	BeegoJson      string
+	Fields         string
+	CurPath        string
+	Option         Option
+	SingleRender   map[string]ProSingleRenderMap
+	GlobalRender   map[string]ProGlobalRenderMap
+	ControllerOnce *sync.Once
+	ModelOnce      *sync.Once
 }
 
 type Option struct {

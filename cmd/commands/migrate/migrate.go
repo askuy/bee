@@ -15,7 +15,6 @@ package migrate
 
 import (
 	"database/sql"
-	"fmt"
 	"os"
 	"os/exec"
 	"path"
@@ -158,7 +157,6 @@ func migrate(goal, currpath, driver, connStr, dir string) {
 		beeLogger.Log.Fatalf("Could not connect to database using '%s': %s", connStr, err)
 	}
 	defer db.Close()
-
 	checkForSchemaUpdateTable(db, driver)
 	latestName, latestTime := getLatestMigration(db, goal)
 	writeMigrationSourceFile(dir, source, driver, connStr, latestTime, latestName, goal)
@@ -297,7 +295,6 @@ func writeMigrationSourceFile(dir, source, driver, connStr string, latestTime in
 		beeLogger.Log.Fatalf("Could not create file: %s", err)
 		return
 	} else {
-		fmt.Println(f)
 		content := strings.Replace(MigrationMainTPL, "{{DBDriver}}", driver, -1)
 		content = strings.Replace(content, "{{DriverRepo}}", driverImportStatement(driver), -1)
 		content = strings.Replace(content, "{{ConnStr}}", connStr, -1)
@@ -320,6 +317,8 @@ func buildMigrationBinary(dir, binary string) {
 		formatShellErrOutput(string(out))
 		removeTempFile(dir, binary)
 		removeTempFile(dir, binary+".go")
+		removeTempFile(dir, "go.mod")
+		removeTempFile(dir, "go.sum")
 		os.Exit(2)
 	}
 
@@ -329,6 +328,8 @@ func buildMigrationBinary(dir, binary string) {
 		formatShellErrOutput(string(out))
 		removeTempFile(dir, binary)
 		removeTempFile(dir, binary+".go")
+		removeTempFile(dir, "go.mod")
+		removeTempFile(dir, "go.sum")
 		os.Exit(2)
 	}
 }
@@ -342,6 +343,8 @@ func runMigrationBinary(dir, binary string) {
 		beeLogger.Log.Errorf("Could not run migration binary2: %s", err)
 		removeTempFile(dir, binary)
 		removeTempFile(dir, binary+".go")
+		removeTempFile(dir, "go.mod")
+		removeTempFile(dir, "go.sum")
 		os.Exit(2)
 	} else {
 		formatShellOutput(string(out))

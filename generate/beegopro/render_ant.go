@@ -88,18 +88,9 @@ func (r *RenderAnt) Exec(name string) {
 
 // write 写bytes到文件
 func (c *RenderAnt) write(filename string, buf string) (err error) {
-	if !c.Option.Overwrite && utils.IsExist(filename) {
-		err = errors.New("file is exist, path is " + filename)
+	// 不允许覆盖
+	if utils.IsExist(filename) && !isNeedOverwrite(filename) {
 		return
-	}
-
-	if c.Option.Overwrite && utils.IsExist(filename) {
-		bakName := fmt.Sprintf("%s.%s.bak", filename, time.Now().Format("2006.01.02.15.04.05"))
-		beeLogger.Log.Infof("bak file '%s'", bakName)
-		if err := os.Rename(filename, bakName); err != nil {
-			err = errors.New("file is bak error, path is " + bakName)
-			return err
-		}
 	}
 
 	filePath := path.Dir(filename)
@@ -108,6 +99,25 @@ func (c *RenderAnt) write(filename string, buf string) (err error) {
 		err = errors.New("write create path " + err.Error())
 		return
 	}
+	filePathBak := filePath+"/bak"
+	err = createPath(filePathBak)
+	if err != nil {
+		err = errors.New("write create path bak " + err.Error())
+		return
+	}
+
+	name := path.Base(filename)
+
+	if utils.IsExist(filename) {
+		bakName := fmt.Sprintf("%s/%s.%s.bak", filePathBak,name,time.Now().Format("2006.01.02.15.04.05"))
+		beeLogger.Log.Infof("bak file '%s'", bakName)
+		if err := os.Rename(filename, bakName); err != nil {
+			err = errors.New("file is bak error, path is " + bakName)
+			return err
+		}
+	}
+
+
 
 	file, err := os.Create(filename)
 	defer file.Close()

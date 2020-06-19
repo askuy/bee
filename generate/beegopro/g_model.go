@@ -32,12 +32,21 @@ func (c *Container) renderModel(modelName string, content ModelsContent) (err er
 	switch content.SourceGen {
 	case "text":
 		c.TextRenderModel(modelName, content)
-		return
 	case "database":
 		c.databaseRenderModel(modelName, content)
+	default:
+		err = errors.New("not support source gen, source gen is " + content.SourceGen)
 		return
 	}
-	err = errors.New("not support source gen, source gen is " + content.SourceGen)
+	c.ModelOnce.Do(func() {
+		render := NewRenderGo("models", "bee_default_model", c.Option)
+		fmt.Println("------>", render.TmplPath+"/"+BeeDefaultModelTmpl)
+
+		if utils.IsExist(render.TmplPath+"/"+BeeDefaultModelTmpl) {
+			render.Exec(BeeDefaultModelTmpl)
+		}
+	})
+
 	return
 }
 
